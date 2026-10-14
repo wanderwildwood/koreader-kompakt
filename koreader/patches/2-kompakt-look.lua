@@ -14,7 +14,8 @@ What it does:
   - taller rows in the top menu, so a thumb finds one;
   - lines and switches in black: KOReader draws them grey, and grey on this
     screen is dithered into a faint speckle;
-  - dialogs with a firmer edge, taller buttons and black lines between them.
+  - dialogs with a firmer edge, taller buttons and black lines between them;
+  - the sizes and counts at the right of list rows in Lato too.
 
 Book text is untouched: that stays whatever the reader chooses in the book.
 ]]
@@ -132,4 +133,20 @@ local buttonTableInit = ButtonTable.init
 function ButtonTable:init(...)
     buttonTableInit(self, ...)
     blackenLines(self.container, 0)
+end
+
+-- The detail at the right of a list row (a file's size, a folder's count)
+-- is set in a typewriter font. In Lato the row reads as one typeface. The
+-- row widget is private to KOReader's menu, so it is reached through the
+-- function that builds the rows; if that ever changes, this does nothing.
+local function upvalue(fn, wanted)
+    for i = 1, 100 do
+        local name, value = debug.getupvalue(fn, i)
+        if name == nil then return nil end
+        if name == wanted then return value end
+    end
+end
+local MenuItem = type(Menu.updateItems) == "function" and upvalue(Menu.updateItems, "MenuItem")
+if type(MenuItem) == "table" and MenuItem.infont == "infont" then
+    MenuItem.infont = "cfont"
 end

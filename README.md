@@ -12,6 +12,7 @@
 - Taller rows in the top menu, and taller buttons in dialogs.
 - Lines and switches in **black**. KOReader draws them grey, and grey on this screen is dithered into a faint speckle.
 - Dialogs with a firmer edge.
+- File sizes and counts at the right of list rows in Lato too, instead of a typewriter font.
 
 The text of your books is not touched. That stays whatever you choose in the book.
 
