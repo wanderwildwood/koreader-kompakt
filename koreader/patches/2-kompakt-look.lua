@@ -63,12 +63,26 @@ end
 -- The face remembers the size as it was asked for, not as drawn: some widgets
 -- ask again with face.orig_size (to step a title down, or for a fallback
 -- font), and without this they would be scaled a second time.
+--
+-- The book lists with covers are left at their own sizes. They work out
+-- their type from the row height, so they grow with fewer books to a page
+-- already; with "Shrink item font size to fit more text" off they keep that
+-- size without checking it fits, and a size larger spills two-line titles
+-- over the row below.
+local unscaled = { ["listmenu.lua"] = true, ["mosaicmenu.lua"] = true }
+local function fromUnscaled()
+    local info = debug.getinfo(3, "S")
+    local file = info and info.source and info.source:match("([^/]+)$")
+    return file ~= nil and unscaled[file] == true
+end
 local getFace = Font.getFace
 function Font:getFace(font, size, faceindex)
     font = by_path[font] or font
     local asked = size or self.sizemap[font or "cfont"] or self.sizemap.cfont
-    local face = getFace(self, font, math.floor(asked * TYPE_SCALE + 0.5), faceindex)
-    if face then face.orig_size = asked end
+    local scale = fromUnscaled() and 1 or TYPE_SCALE
+    local face = getFace(self, font, math.floor(asked * scale + 0.5), faceindex)
+    -- (For an unscaled face, the size that scales back up to what it is drawn at.)
+    if face then face.orig_size = asked * scale / TYPE_SCALE end
     return face
 end
 
