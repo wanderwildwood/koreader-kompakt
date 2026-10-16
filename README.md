@@ -38,6 +38,10 @@ KOReader keeps its own `koreader` folder at the top of the phone's storage, besi
 
 Without the two fonts the patch still works and keeps KOReader's own typeface; everything else applies.
 
+It needs KOReader from [KOReader's own releases](https://github.com/koreader/koreader/releases) (the arm64 APK). The F-Droid build of KOReader skips user patches on purpose, so with it nothing changes. Switching means uninstalling the F-Droid copy first; books, settings and reading history live in the `koreader` folder and stay where they are.
+
+If nothing changes, the file browser's Tools → More tools → Patch management lists the patches KOReader found and how many ran. "Disable external plugins and user-patches", if ticked, turns every patch off.
+
 ## Removing it
 
 Delete `koreader/patches/2-kompakt-look.lua` and restart KOReader. The two fonts can stay or go.
