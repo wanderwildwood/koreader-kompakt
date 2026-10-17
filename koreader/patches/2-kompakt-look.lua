@@ -3,7 +3,8 @@ KOReader on the Mudita Kompakt, made to read like the phone's own apps.
 
 A user patch: KOReader runs every file in koreader/patches/ at startup, so
 nothing in KOReader itself is changed and it updates as usual. Delete this
-file and everything it does is gone; it writes none of KOReader's settings.
+file and everything it does is gone; it writes none of KOReader's settings
+except its own one option, below.
 
 What it does:
   - the interface in Lato, the typeface of the Kompakt's own apps, when
@@ -15,7 +16,9 @@ What it does:
   - lines and switches in black: KOReader draws them grey, and grey on this
     screen is dithered into a faint speckle;
   - dialogs with a firmer edge, taller buttons and black lines between them;
-  - the sizes and counts at the right of list rows in Lato too.
+  - the sizes and counts at the right of list rows in Lato too;
+  - an option, off at first, to hide the size and extension of books in the
+    file browser, so the list reads by title.
 
 Book text is untouched: that stays whatever the reader chooses in the book.
 ]]
@@ -163,4 +166,77 @@ end
 local MenuItem = type(Menu.updateItems) == "function" and upvalue(Menu.updateItems, "MenuItem")
 if type(MenuItem) == "table" and MenuItem.infont == "infont" then
     MenuItem.infont = "cfont"
+end
+
+-- An option, off until it is ticked: book names without their extension and
+-- without the size at the right, so the file browser reads like a shelf of
+-- titles. Folders and their counts stay as they are. It is in File browser
+-- settings -> Classic mode settings, as the cover lists have their own
+-- "Show file properties" and already show titles without the extension.
+-- The names are trimmed after the list is sorted, so sorting by type still
+-- sorts by type. If KOReader's file browser changes shape, this does nothing.
+local HIDE_KEY = "kompakt_hide_size_ext"
+local gettext = require("gettext")
+local DocumentRegistry = require("document/documentregistry")
+local filemanagerutil = require("apps/filemanager/filemanagerutil")
+local genItemTable = FileChooser.genItemTable
+local FileManagerMenu = require("apps/filemanager/filemanagermenu")
+local setUpdateItemTable = FileManagerMenu.setUpdateItemTable
+if type(genItemTable) == "function" and type(FileChooser.getCollate) == "function"
+        and type(filemanagerutil.splitFileNameType) == "function"
+        and type(setUpdateItemTable) == "function" then
+    function FileChooser:genItemTable(dirs, files, path, ...)
+        local items = genItemTable(self, dirs, files, path, ...)
+        if not (path and self.name == "filemanager" and not self.display_mode_type
+                and G_reader_settings:isTrue(HIDE_KEY)) then
+            return items
+        end
+        local collate = self:getCollate()
+        local shows_size = not (collate and collate.mandatory_func)
+        for _, item in ipairs(items) do
+            if item.is_file and item.path and DocumentRegistry:hasProvider(item.path) then
+                local name = filemanagerutil.splitFileNameType(item.text)
+                if name and name ~= "" then item.text = name end
+                if shows_size and type(item.mandatory) == "string" then
+                    -- Keep the star of a book in a collection.
+                    item.mandatory = item.mandatory:find("^☆") and "☆" or nil
+                end
+            end
+        end
+        return items
+    end
+
+    function FileManagerMenu:setUpdateItemTable(...)
+        setUpdateItemTable(self, ...)
+        -- The finished menu no longer keeps its items by name, so the file
+        -- browser's Settings is found in it by the id the sorter gave it.
+        local function find(menu, depth)
+            if type(menu) ~= "table" or depth > 3 then return end
+            for _, entry in ipairs(menu) do
+                if type(entry) == "table" then
+                    if entry.id == "filebrowser_settings" then return entry end
+                    local found = find(entry.sub_item_table or entry, depth + 1)
+                    if found then return found end
+                end
+            end
+        end
+        local settings = find(self.tab_item_table, 0)
+        local list = settings and settings.sub_item_table
+        if type(list) ~= "table" then return end
+        for _, entry in ipairs(list) do
+            if entry.text == gettext("Classic mode settings") and type(entry.sub_item_table) == "table" then
+                list = entry.sub_item_table
+                break
+            end
+        end
+        local ui = self.ui
+        table.insert(list, {
+            text = gettext("Hide file size and extension"),
+            checked_func = function() return G_reader_settings:isTrue(HIDE_KEY) end,
+            callback = function()
+                G_reader_settings:flipNilOrFalse(HIDE_KEY)
+                if ui and ui.file_chooser then ui.file_chooser:refreshPath() end
+            end,
+        })
+    end
 end

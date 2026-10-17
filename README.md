@@ -13,6 +13,7 @@
 - Lines and switches in **black**. KOReader draws them grey, and grey on this screen is dithered into a faint speckle.
 - Dialogs with a firmer edge.
 - File sizes and counts at the right of list rows in Lato too, instead of a typewriter font.
+- An option to show books by title alone, without the file extension or size: File browser → Settings → Classic mode settings → Hide file size and extension. Off until ticked; folders keep their counts. The cover lists have their own "Show file properties" for the same. Idea from a Mudita forum reader.
 
 The text of your books is not touched. That stays whatever you choose in the book.
 
@@ -22,7 +23,7 @@ The text of your books is not touched. That stays whatever you choose in the boo
 
 ## How it works
 
-KOReader runs any file it finds in its `koreader/patches/` folder when it starts. This is one of those files, so KOReader itself is not changed, and it keeps updating as usual. Nothing is written into KOReader's settings: delete the file and KOReader looks exactly as it did.
+KOReader runs any file it finds in its `koreader/patches/` folder when it starts. This is one of those files, so KOReader itself is not changed, and it keeps updating as usual. Nothing is written into KOReader's settings except that one option, once ticked: delete the file and KOReader looks exactly as it did.
 
 ## Installing
 
