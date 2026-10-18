@@ -18,7 +18,8 @@ What it does:
   - dialogs with a firmer edge, taller buttons and black lines between them;
   - the sizes and counts at the right of list rows in Lato too;
   - an option, off at first, to hide the size and extension of books in the
-    file browser, so the list reads by title.
+    file browser, so the list reads by title - in the classic list, and in
+    the detailed list with covers, where the reading progress stays.
 
 Book text is untouched: that stays whatever the reader chooses in the book.
 ]]
@@ -171,12 +172,49 @@ end
 -- An option, off until it is ticked: book names without their extension and
 -- without the size at the right, so the file browser reads like a shelf of
 -- titles. Folders and their counts stay as they are. It is in File browser
--- settings -> Classic mode settings, as the cover lists have their own
--- "Show file properties" and already show titles without the extension.
--- The names are trimmed after the list is sorted, so sorting by type still
--- sorts by type. If KOReader's file browser changes shape, this does nothing.
+-- settings, under both Classic mode settings and Mosaic and detailed list
+-- settings: one switch, the same in both places.
+-- In the classic list the names are trimmed after the list is sorted, so
+-- sorting by type still sorts by type. The cover lists already leave the
+-- extension off the title; there the switch stands for the cover browser's
+-- own "Show file properties" turned off, which drops the type and size
+-- and keeps the reading progress and the "new" mark. Turning "Show file
+-- properties" back on turns this off. If KOReader's file browser or the
+-- cover browser changes shape, this does nothing.
 local HIDE_KEY = "kompakt_hide_size_ext"
 local gettext = require("gettext")
+
+-- The cover browser is a plugin, loaded after this patch runs, so its
+-- settings are reached once the file browser's menu is built.
+local cover_hooked = false
+local function hookCoverBrowser()
+    if cover_hooked then return end
+    local BookInfoManager = package.loaded["bookinfomanager"]
+    if type(BookInfoManager) ~= "table" or type(BookInfoManager.getSetting) ~= "function"
+            or type(BookInfoManager.toggleSetting) ~= "function"
+            or type(BookInfoManager.saveSetting) ~= "function" then
+        return
+    end
+    cover_hooked = true
+    local getSetting = BookInfoManager.getSetting
+    function BookInfoManager:getSetting(key, ...)
+        if key == "hide_file_info" and G_reader_settings:isTrue(HIDE_KEY) then return true end
+        return getSetting(self, key, ...)
+    end
+    local toggleSetting = BookInfoManager.toggleSetting
+    function BookInfoManager:toggleSetting(key, ...)
+        if key == "hide_file_info" and G_reader_settings:isTrue(HIDE_KEY) then
+            -- "Show file properties" ticked while ours is on: show them again.
+            G_reader_settings:makeFalse(HIDE_KEY)
+            if getSetting(self, key) then self:saveSetting(key, false) end
+            local FileManager = package.loaded["apps/filemanager/filemanager"]
+            local fc = FileManager and FileManager.instance and FileManager.instance.file_chooser
+            if fc and fc.kompakt_trimmed then fc:refreshPath() end
+            return false
+        end
+        return toggleSetting(self, key, ...)
+    end
+end
 local DocumentRegistry = require("document/documentregistry")
 local filemanagerutil = require("apps/filemanager/filemanagerutil")
 local genItemTable = FileChooser.genItemTable
@@ -187,10 +225,12 @@ if type(genItemTable) == "function" and type(FileChooser.getCollate) == "functio
         and type(setUpdateItemTable) == "function" then
     function FileChooser:genItemTable(dirs, files, path, ...)
         local items = genItemTable(self, dirs, files, path, ...)
+        if path and self.name == "filemanager" then self.kompakt_trimmed = nil end
         if not (path and self.name == "filemanager" and not self.display_mode_type
                 and G_reader_settings:isTrue(HIDE_KEY)) then
             return items
         end
+        self.kompakt_trimmed = true
         local collate = self:getCollate()
         local shows_size = not (collate and collate.mandatory_func)
         for _, item in ipairs(items) do
@@ -204,6 +244,25 @@ if type(genItemTable) == "function" and type(FileChooser.getCollate) == "functio
             end
         end
         return items
+    end
+
+    -- The file browser fills its list through here, the first time just
+    -- after the plugins are loaded, so the cover browser is reached here
+    -- before any book is drawn. And the cover browser changes view by
+    -- redrawing the list it has, without reading the folder again; the
+    -- names are trimmed for the classic list only, so on a change of view
+    -- the list is read again.
+    if type(FileChooser.switchItemTable) == "function" and type(FileChooser.genItemTableFromPath) == "function" then
+        local switchItemTable = FileChooser.switchItemTable
+        function FileChooser:switchItemTable(title, item_table, ...)
+            if self.name == "filemanager" then hookCoverBrowser() end
+            if item_table == nil and self.name == "filemanager" and self.path
+                    and (self.kompakt_trimmed or G_reader_settings:isTrue(HIDE_KEY)) then
+                self.kompakt_trimmed = nil
+                item_table = self:genItemTableFromPath(self.path)
+            end
+            return switchItemTable(self, title, item_table, ...)
+        end
     end
 
     function FileManagerMenu:setUpdateItemTable(...)
@@ -223,20 +282,41 @@ if type(genItemTable) == "function" and type(FileChooser.getCollate) == "functio
         local settings = find(self.tab_item_table, 0)
         local list = settings and settings.sub_item_table
         if type(list) ~= "table" then return end
+        hookCoverBrowser()
+        local classic, covers
         for _, entry in ipairs(list) do
-            if entry.text == gettext("Classic mode settings") and type(entry.sub_item_table) == "table" then
-                list = entry.sub_item_table
-                break
+            if type(entry.sub_item_table) == "table" then
+                if entry.text == gettext("Classic mode settings") then
+                    classic = entry.sub_item_table
+                elseif entry.text == gettext("Mosaic and detailed list settings") then
+                    covers = entry.sub_item_table
+                end
             end
         end
         local ui = self.ui
-        table.insert(list, {
-            text = gettext("Hide file size and extension"),
-            checked_func = function() return G_reader_settings:isTrue(HIDE_KEY) end,
-            callback = function()
-                G_reader_settings:flipNilOrFalse(HIDE_KEY)
-                if ui and ui.file_chooser then ui.file_chooser:refreshPath() end
-            end,
-        })
+        local function item()
+            return {
+                text = gettext("Hide file size and extension"),
+                help_text = gettext("Books are listed by title alone, without their file type and size, in the classic list and the detailed list alike. Reading progress stays."),
+                checked_func = function() return G_reader_settings:isTrue(HIDE_KEY) end,
+                callback = function()
+                    G_reader_settings:flipNilOrFalse(HIDE_KEY)
+                    local fc = ui and ui.file_chooser
+                    if fc then
+                        fc:refreshPath()
+                        if fc.display_mode_type then fc:updateItems(1, true) end
+                    end
+                end,
+            }
+        end
+        table.insert(classic or list, item())
+        if covers and cover_hooked then
+            -- Just under the cover browser's own "Show file properties".
+            local at = #covers + 1
+            for i, entry in ipairs(covers) do
+                if entry.text == gettext("Show file properties") then at = i + 1 break end
+            end
+            table.insert(covers, at, item())
+        end
     end
 end

@@ -13,7 +13,7 @@
 - Lines and switches in **black**. KOReader draws them grey, and grey on this screen is dithered into a faint speckle.
 - Dialogs with a firmer edge.
 - File sizes and counts at the right of list rows in Lato too, instead of a typewriter font.
-- An option to show books by title alone, without the file extension or size: File browser → Settings → Classic mode settings → Hide file size and extension. Off until ticked; folders keep their counts. The cover lists have their own "Show file properties" for the same. Idea from a Mudita forum reader.
+- An option to show books by title alone, without the file type or size: File browser → Settings → Classic mode settings (or Mosaic and detailed list settings) → Hide file size and extension. Off until ticked; it works in the classic list and the detailed list with covers, where the reading progress and the "new" mark stay, and folders keep their counts. Idea from a Mudita forum reader.
 
 The text of your books is not touched. That stays whatever you choose in the book.
 
